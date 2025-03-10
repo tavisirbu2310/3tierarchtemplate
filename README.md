@@ -28,6 +28,8 @@ There are public and private subnets in the VPC:
 - app tier and db tier subnets are private, which is the default
 - web tier is public which means its been set up to use an Internet Gateway. This works by creating a new route table, assigning the subnets that I want to be private into this route table and then creating a route that connects to the internet through the Internet Gateway that's also created in the template
 
+Note: it is important that the subnets do not have any overlapping IPs, so I set up all those CIDR blocks with this in mind
+
 This can be improved by also creating a NAT Gateway and using it for the private subnets so that the app and db tiers have outbound access to the internet but continue to stay private to outside connections. This would be beneficial so that things like updates or external API calls could be easily set up in the private subnet resources. But I chose to not do this because this falls outside of the free tier of AWS and I wanted to have all my resources deployed and running as well, but also the cost to stay as low as possible.
 
 #### Web tier
@@ -40,7 +42,7 @@ The web tier creates the following resources:
 
 #### App tier
 
-App has a similar set up as the web tier for EC2 instances, ALB, launch template, auto scaling group, but with a few differences:
+App tier has a similar set up as the web tier for EC2 instances, ALB, launch template, auto scaling group, but with a few differences:
 - all resources are now inside private subnets, meaning there is no connection in or out of those subnets
 - the Security Group created here is only allowing traffic from within the VPC itself, and this is why as part of this set up I had to create a Custom AMI that installs Docker and pulls my docker image from Docker Hub so that then I can connect to the database from the App tier EC2 instances. The Custom AMI set up is not in the yaml files because I had to perform it through the AWS Console, but esentially I created an EC2 instance in the public subnet, I installed all the libraries that I needed from the internet, I created the Custom AMI and then that AMI I used as part of the Launch Template of these private EC2 instances. This ensured that Docker was installed, my Docker image was pulled and I could run the docker run command that you can see into the Launch template set up. For this I ran the following commands on the EC2 which I used for creating the Custom AMI:
 
@@ -64,19 +66,16 @@ As part of this set up, I connected to the DB tier by SSHing into one of the pub
 
 ```psql --host=your-rds-endpoint.amazonaws.com --port=5432 --username=admin --dbname=mydatabase```
 
-and then I ran these commands to create a table and insert a record into the table:
+and then I ran these commands to create a table, insert a record into the table and check if the record was created successfully:
 
 ```
--- Create the messages table (if it doesn't exist)
 CREATE TABLE IF NOT EXISTS messages (
     id SERIAL PRIMARY KEY,
     message TEXT NOT NULL
 );
 
--- Insert a sample record
 INSERT INTO messages (message) VALUES ('Hello from the database!');
 
--- Verify that the record was inserted
 SELECT * FROM messages;
 ```
 
@@ -86,7 +85,7 @@ This ensured that I have a record available in the database that I can then fetc
 #### Code part
 
 The code is a simple node.js app that creates a new API for the backend using express. This API will be available by running a GET request at `BackendURL/api/message` and what this does is it sets up a functionality that returns the first element of the `messages` table from the database when someone runs a GET request on that URL path
-It also starts the server on port 80 and creates a default log for the `/` path. As part of the GET API setup, this connects to the database, and because the private instances are in the same VPC with the DB, even though they are private, they are still allowed to access resources within the VPC, that includes the DB.
+It also starts the server on port 80 and creates a default log for the `/` path. As part of the GET API setup, this connects to the database, and because the private instances are in the same VPC with the DB, even though they are private, they are still allowed by the SG to access resources within the VPC, that includes the DB.
 
 This code is dockarized, in the Dockerfile I make sure its copied, dependencies are installed and the node file runs when that docker container is created.
 
@@ -116,3 +115,5 @@ This showcases the connection between the front end and the backend and the back
 I would also use a DNS service like for example Route53 if going through the full AWS stack. I'd use a domain registrar(in this case, Route53 can also be used) to create a custom domain and create a hosted zone with multiple records pointing at different resources in the app. This would add more routing capabilities into the app, perform more health checks on endpoints and making the redirecting of the users to different parts of the app more straight forward.
 
 I could also add NACL rules at the subnet level, but as part of the demo, in my opinion security groups are enough for securing the resources.
+
+Finally, some parts of the infrastructure could've been more reusable, I could've made it more parameter dependent, but for demo purposes I chose to only parameterise the sensitive information, like DB credentials, resource ids.
