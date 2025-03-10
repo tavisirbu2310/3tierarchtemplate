@@ -1,0 +1,10 @@
+{
+  "name": "app-tier-db-connect",
+  "version": "1.0.0",
+  "description": "Demo Node.js app connecting to PostgreSQL",
+  "main": "dbConnect.js",
+  "dependencies": {
+    "express": "^4.17.1",
+    "pg": "^8.7.1"
+  }
+}
