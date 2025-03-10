@@ -40,7 +40,16 @@ The web tier creates the following resources:
 
 App has a similar set up as the web tier for EC2 instances, ALB, launch template, auto scaling group, but with a few differences:
 - all resources are now inside private subnets, meaning there is no connection in or out of those subnets
-- the Security Group created here is only allowing traffic from within the VPC itself, and this is why as part of this set up I had to create a Custom AMI that installs Docker and pulls my docker image from Docker Hub so that then I can connect to the database from the App tier EC2 instances. The Custom AMI set up is not in the yaml files because I had to perform it through the AWS Console, but esentially I created an EC2 instance in the public subnet, I installed all the libraries that I needed from the internet, I created the Custom AMI and then that AMI I used as part of the Launch Template of these private EC2 instances. This ensured that Docker was installed, my Docker image was pulled and I could run the docker run command that you can see into the Launch template set up.
+- the Security Group created here is only allowing traffic from within the VPC itself, and this is why as part of this set up I had to create a Custom AMI that installs Docker and pulls my docker image from Docker Hub so that then I can connect to the database from the App tier EC2 instances. The Custom AMI set up is not in the yaml files because I had to perform it through the AWS Console, but esentially I created an EC2 instance in the public subnet, I installed all the libraries that I needed from the internet, I created the Custom AMI and then that AMI I used as part of the Launch Template of these private EC2 instances. This ensured that Docker was installed, my Docker image was pulled and I could run the docker run command that you can see into the Launch template set up. For this I ran the following commands on the EC2 which I used for creating the Custom AMI:
+
+```
+sudo yum install -y docker
+sudo systemctl start docker
+sudo systemctl enable docker
+sudo docker pull tavisirbu2310/db-connect:latest
+```
+
+which once again, installs Docker, starts it, makes sure docker starts at boot time and pulls my image from dockerhub. This makes it easier for the EC2s in the App tier to just run that docker image without needing internet access. And this could've been easily improved by using a NAT Gateway that would allow the App tier to connect to the internet and download docker etc. With that setup I woudn't have needed the Custom AMI set up and I could've just done all this script straight into the UserData of the private instances. But for cost purposes and because this is a demo, I chose to proceed with this workaround instead
 
 #### DB tier
 
@@ -70,3 +79,34 @@ SELECT * FROM messages;
 ```
 
 This ensured that I have a record available in the database that I can then fetch by connecting to the database from my App/Backend tier
+
+
+#### Code part
+
+The code is a simple node.js app that creates a new API for the backend using express. This API will be available by running a GET request at `BackendURL/api/message` and what this does is it sets up a functionality that returns the first element of the `messages` table from the database when someone runs a GET request on that URL path
+It also starts the server on port 80 and creates a default log for the `/` path. As part of the GET API setup, this connects to the database, and because the private instances are in the same VPC with the DB, even though they are private, they are still allowed to access resources within the VPC, that includes the DB.
+
+This code is dockarized, in the Dockerfile I make sure its copied, dependencies are installed and the node file runs when that docker container is created.
+
+To create the docker image and push it to docker hub i use the following:
+
+```
+docker build -t db-connect .
+docker tag my-app:latest tavisirbu2310/db-connect:latest
+docker push tavisirbu2310/db-connect:latest
+```
+
+You can pull my image yourselves for testing purposes by running:
+
+`docker push tavisirbu2310/db-connect:latest`
+
+
+
+##### Summary
+
+When accessing the ALB link in the beginning, that points to the web tier EC2 instances. Those instances show the following:
+- a welcome message coming from the front end
+- A response from the backend tier by running this `curl -s -o /dev/null -w "%{http_code}" http://${BackendALBDNS}/api/message` which just makes sure the response is a 200 status code
+- The database message coming from the backend API by running this `curl -s http://${BackendALBDNS}/api/message` which in response, because of the setup of the node.js code, it will show the first message in the database `messages` table
+
+This showcases the connection between the front end and the backend and the backend and the database. This is only a demo template of how a real world set up would look like. In a real world set up I could use more AWS services like AWS ECS for docker or AWS EKS for using kubernetes and creating multiple backend microservices.
