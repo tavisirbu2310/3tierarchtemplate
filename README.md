@@ -100,7 +100,7 @@ docker push tavisirbu2310/db-connect:latest
 
 You can pull my image yourselves for testing purposes by running:
 
-`docker push tavisirbu2310/db-connect:latest`
+`docker pull tavisirbu2310/db-connect:latest`
 
 
 
