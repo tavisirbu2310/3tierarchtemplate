@@ -1,6 +1,8 @@
 # 3 tier architecture template
 This is a demo template for a 3 tier architecture.
 
+As part of setting up this infrastructure, I used CloudFormation templates. This is the Infrastructure as Code tool that I've used in the past and that I'm most comfortable with.
+
 All the files are currently deployed and running and can be accessed on the DNS of the web tier ALB [here](http://production-webalb-1634631816.eu-west-3.elb.amazonaws.com/)
 
 The resources are split as follows:
