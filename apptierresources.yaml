@@ -1,0 +1,112 @@
+AWSTemplateFormatVersion: 2010-09-09
+
+Description: >
+  This template creates the App tear resources for a 3 tier architecture using CloudFormation.
+
+Parameters:
+  VpcId:
+    Type: String
+  AppSubnetList:
+    Type: List<AWS::EC2::Subnet::Id>
+  CustomAMIId:
+    Type: String
+  KeyName:
+    Type: AWS::EC2::KeyPair::KeyName
+  RdsEndpoint:
+    Type: String
+  DbName:
+    Type: String
+  DbUser:
+    Type: String
+  DbPassword:
+    Type: String
+
+Resources:
+  # App Tier Resources
+  AppInstanceSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: "Allow HTTP traffic from the Web ALB to the app tier"
+      VpcId: !Ref VpcId
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 80
+          ToPort: 80
+          CidrIp: 10.16.0.0/16
+      SecurityGroupEgress:
+        - IpProtocol: -1
+          CidrIp: 0.0.0.0/0
+
+  AppLaunchTemplate:
+    Type: AWS::EC2::LaunchTemplate
+    Properties:
+      LaunchTemplateName: !Sub "Production-AppLaunchTemplate"
+      LaunchTemplateData:
+        ImageId: !Ref CustomAMIId
+        InstanceType: t2.micro
+        KeyName: !Ref KeyName
+        SecurityGroupIds:
+          - !Ref AppInstanceSecurityGroup
+        UserData:
+          Fn::Base64: !Sub |
+            #!/bin/bash
+
+            sudo docker run -d -p 80:80 \
+            -e DB_HOST="${RdsEndpoint}" \
+            -e DB_NAME="${DbName}" \
+            -e DB_USER="${DbUser}" \
+            -e DB_PASSWORD="${DbPassword}" \
+            tavisirbu2310/db-connect
+
+  AppAutoScalingGroup:
+    Type: AWS::AutoScaling::AutoScalingGroup
+    Properties:
+      VPCZoneIdentifier: !Ref AppSubnetList
+      LaunchTemplate:
+        LaunchTemplateId: !Ref AppLaunchTemplate
+        Version: !GetAtt AppLaunchTemplate.LatestVersionNumber
+      MinSize: 3
+      MaxSize: 3
+      DesiredCapacity: 3
+      HealthCheckType: EC2
+      HealthCheckGracePeriod: 300
+      TargetGroupARNs:
+        - !Ref AppTargetGroup
+      Tags:
+        - Key: Name
+          Value: !Sub "Production-AppInstance"
+          PropagateAtLaunch: true
+
+  AppInternalALB:
+    Type: AWS::ElasticLoadBalancingV2::LoadBalancer
+    Properties:
+      Name: !Sub "Production-AppInternalALB"
+      Subnets: !Ref AppSubnetList
+      SecurityGroups:
+        - !Ref AppInstanceSecurityGroup
+      Scheme: internal
+      Type: application
+
+  AppTargetGroup:
+    Type: AWS::ElasticLoadBalancingV2::TargetGroup
+    Properties:
+      Name: !Sub "Production-AppTG"
+      VpcId: !Ref VpcId
+      Protocol: HTTP
+      Port: 80
+      TargetType: instance
+      HealthCheckProtocol: HTTP
+      HealthCheckPort: "80"
+      HealthCheckPath: /
+      Matcher:
+        HttpCode: "200"
+
+  AppALBListener:
+    Type: AWS::ElasticLoadBalancingV2::Listener
+    Properties:
+      LoadBalancerArn: !Ref AppInternalALB
+      Port: 80
+      Protocol: HTTP
+      DefaultActions:
+        - Type: forward
+          TargetGroupArn: !Ref AppTargetGroup

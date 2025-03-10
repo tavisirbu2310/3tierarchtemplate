@@ -1,0 +1,58 @@
+AWSTemplateFormatVersion: 2010-09-09
+
+Description: >
+  This template creates the DB tier for a 3 tier architecture using CloudFormation.
+
+Parameters:
+  VpcId:
+    Type: String
+  DBSubnets:
+    Type: List<AWS::EC2::Subnet::Id>
+  AppSG:
+    Type: String
+  DBUsername:
+    Type: String
+  DBPassword:
+    Type: String
+
+Resources:
+  DBSubnetGroup:
+    Type: AWS::RDS::DBSubnetGroup
+    Properties:
+      DBSubnetGroupDescription: "Subnets for the RDS PostgreSQL database"
+      SubnetIds: !Ref DBSubnets
+      Tags:
+        - Key: Name
+          Value: !Sub "Production-DBSubnetGroup"
+
+  RDSInstanceSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: "Allow PostgreSQL access from the App tier"
+      VpcId: !Ref VpcId
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 5432
+          ToPort: 5432
+          SourceSecurityGroupId: !Ref AppSG
+      SecurityGroupEgress:
+        - IpProtocol: -1
+          CidrIp: 0.0.0.0/0
+
+  RDSInstance:
+    Type: AWS::RDS::DBInstance
+    Properties:
+      Engine: postgres
+      EngineVersion: "13.20"
+      DBInstanceClass: db.t3.micro
+      AllocatedStorage: 20
+      DBName: ProductionDB
+      MasterUsername: !Ref DBUsername
+      MasterUserPassword: !Ref DBPassword
+      VPCSecurityGroups:
+        - !Ref RDSInstanceSecurityGroup
+      DBSubnetGroupName: !Ref DBSubnetGroup
+      MultiAZ: false
+      PubliclyAccessible: false
+      BackupRetentionPeriod: 7
+      StorageType: gp2

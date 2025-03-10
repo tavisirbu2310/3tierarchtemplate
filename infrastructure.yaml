@@ -1,0 +1,167 @@
+AWSTemplateFormatVersion: 2010-09-09
+
+Description: >
+  This template creates the networking resources for a 3 tier architecture using CloudFormation.
+
+Resources:
+  # VPC
+  VPC:
+    Type: AWS::EC2::VPC
+    Properties:
+      CidrBlock: 10.16.0.0/16
+      EnableDnsSupport: "true"
+      EnableDnsHostnames: "true"
+      Tags:
+        - Key: Name
+          Value: Production-VPC
+
+  IGW:
+    Type: AWS::EC2::InternetGateway
+    Properties:
+      Tags:
+        - Key: name
+          Value: vpc-igw
+
+  AttachIGW:
+    Type: AWS::EC2::VPCGatewayAttachment
+    Properties:
+      VpcId: !Ref VPC
+      InternetGatewayId: !Ref IGW
+
+  RouteTable:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref VPC
+      Tags:
+        - Key: name
+          Value: vpc-route-table
+
+  SubnetRouteTableAssociationWebTierA:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: !Ref WebSubnetA
+      RouteTableId: !Ref RouteTable
+
+  SubnetRouteTableAssociationWebTierB:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: !Ref WebSubnetB
+      RouteTableId: !Ref RouteTable
+
+  SubnetRouteTableAssociationWebTierC:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: !Ref WebSubnetC
+      RouteTableId: !Ref RouteTable
+
+  Route:
+    Type: AWS::EC2::Route
+    Properties:
+      RouteTableId: !Ref RouteTable
+      DestinationCidrBlock: 0.0.0.0/0
+      GatewayId: !Ref IGW
+
+  # ----- Availability Zone 1 Subnets -----
+  # Database subnet in AZ1
+  DBSubnetA:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref VPC
+      CidrBlock: 10.16.0.0/20
+      AvailabilityZone: eu-west-3a
+      Tags:
+        - Key: Name
+          Value: DBSubnetA
+
+  # Application Backend subnet in AZ1
+  BackendSubnetA:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref VPC
+      CidrBlock: 10.16.16.0/20
+      AvailabilityZone: eu-west-3a
+      Tags:
+        - Key: Name
+          Value: BackendSubnetA
+
+  # Web Tier subnet in AZ1 (public)
+  WebSubnetA:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref VPC
+      CidrBlock: 10.16.32.0/20
+      AvailabilityZone: eu-west-3a
+      MapPublicIpOnLaunch: true
+      Tags:
+        - Key: Name
+          Value: WebSubnetA
+
+  # ----- Availability Zone 2 Subnets -----
+  # Database subnet in AZ2
+  DBSubnetB:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref VPC
+      CidrBlock: 10.16.64.0/20
+      AvailabilityZone: eu-west-3b
+      Tags:
+        - Key: Name
+          Value: DBSubnetB
+
+  # Application Backend subnet in AZ2
+  BackendSubnetB:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref VPC
+      CidrBlock: 10.16.80.0/20
+      AvailabilityZone: eu-west-3b
+      Tags:
+        - Key: Name
+          Value: BackendSubnetB
+
+  # Web Tier subnet in AZ2 (public)
+  WebSubnetB:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref VPC
+      CidrBlock: 10.16.96.0/20
+      AvailabilityZone: eu-west-3b
+      MapPublicIpOnLaunch: true
+      Tags:
+        - Key: Name
+          Value: WebSubnetB
+
+  # ----- Availability Zone 3 Subnets -----
+  # Database subnet in AZ3
+  DBSubnetC:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref VPC
+      CidrBlock: 10.16.112.0/20
+      AvailabilityZone: eu-west-3c
+      Tags:
+        - Key: Name
+          Value: DBSubnetC
+
+  # Application Backend subnet in AZ3
+  BackendSubnetC:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref VPC
+      CidrBlock: 10.16.128.0/20
+      AvailabilityZone: eu-west-3c
+      Tags:
+        - Key: Name
+          Value: BackendSubnetC
+
+  # Web Tier subnet in AZ3 (public)
+  WebSubnetC:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref VPC
+      CidrBlock: 10.16.144.0/20
+      AvailabilityZone: eu-west-3c
+      MapPublicIpOnLaunch: true
+      Tags:
+        - Key: Name
+          Value: WebSubnetC
