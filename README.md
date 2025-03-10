@@ -94,7 +94,7 @@ To create the docker image and push it to docker hub i use the following:
 
 ```
 docker build -t db-connect .
-docker tag my-app:latest tavisirbu2310/db-connect:latest
+docker tag tavisirbu2310/db-connect:latest tavisirbu2310/db-connect:latest
 docker push tavisirbu2310/db-connect:latest
 ```
 
